@@ -159,7 +159,7 @@ void AJogoOnlineCharacter::OnCreateSessionComplete(FName SessionName, bool bWasS
 				-1,
 				15.f,
 				FColor::Blue,
-				FString::Printf(TEXT("A sessão foi criada com o nome %s"), *SessionName.ToString())
+				FString::Printf(TEXT("A sessao foi criada com o nome %s"), *SessionName.ToString())
 			);
 		}
 
@@ -176,6 +176,18 @@ void AJogoOnlineCharacter::OnFindSessionComplete(bool bWasSuccessful)
 	if (!OnlineSessionInterface.IsValid())
 		return;
 
+	if (SessionSearch->SearchResults.Num() == 0)
+	{
+		if (GEngine)
+		{
+			GEngine->AddOnScreenDebugMessage(
+				-1,
+				15.f,
+				FColor::Red,
+				FString::Printf(TEXT("Nao encontrou nenhuma sessao"))
+			);
+		}
+	}
 	
 	for (auto Result : SessionSearch->SearchResults) {
 		FString Id = Result.GetSessionIdStr();
@@ -243,12 +255,6 @@ void AJogoOnlineCharacter::OnJoinSessionComplete(FName SessionName, EOnJoinSessi
 		if (PlayerController != nullptr) {
 			PlayerController->ClientTravel(Address, ETravelType::TRAVEL_Absolute);
 		}
-
-		UWorld* World = GetWorld();
-
-		if (World) {
-			World->ServerTravel(FString("/Game/ThirdPerson/Maps/Lobby?listen"));
-		}
 	}
 }
 
@@ -257,14 +263,12 @@ void AJogoOnlineCharacter::CreateGameSession()
 	if (!OnlineSessionInterface.IsValid())
 		return;
 
-	auto ExistingSession = OnlineSessionInterface->GetNamedSession(NAME_GameSession);
-
-	if (ExistingSession != nullptr)
+	if (const auto ExistingSession = OnlineSessionInterface->GetNamedSession(NAME_GameSession); ExistingSession != nullptr)
 		OnlineSessionInterface->DestroySession(NAME_GameSession);
 
 	OnlineSessionInterface->AddOnCreateSessionCompleteDelegate_Handle(CreateSessionCompleteDelegate);
 
-	TSharedPtr<FOnlineSessionSettings> SessionSettings = MakeShareable(new FOnlineSessionSettings());
+	const TSharedPtr<FOnlineSessionSettings> SessionSettings = MakeShareable(new FOnlineSessionSettings());
 	
 	SessionSettings->bIsLANMatch = false;
 	SessionSettings->NumPublicConnections = 4;
@@ -272,6 +276,7 @@ void AJogoOnlineCharacter::CreateGameSession()
 	SessionSettings->bAllowJoinViaPresence = true;
 	SessionSettings->bUsesPresence = true;
 	SessionSettings->bShouldAdvertise = true;
+	SessionSettings->bUseLobbiesIfAvailable = true;
 	SessionSettings->Set(FName("MatchType"), FString("FreeForAll"), EOnlineDataAdvertisementType::ViaOnlineService);
 
 	const ULocalPlayer* LocalPlayer = GetWorld()->GetFirstLocalPlayerFromController();
@@ -284,7 +289,7 @@ void AJogoOnlineCharacter::JoinGameSession()
 	if (!OnlineSessionInterface.IsValid())
 		return;
 
-	SessionSearch = MakeShareable(new FOnlineSessionSearch);
+	SessionSearch = MakeShareable(new FOnlineSessionSearch());
 
 	OnlineSessionInterface->AddOnFindSessionsCompleteDelegate_Handle(FindSessionsCompleteDelegate);
 
